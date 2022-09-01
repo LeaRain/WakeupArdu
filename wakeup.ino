@@ -2,10 +2,19 @@
 #include <RtcDS1302.h>
 #include <LiquidCrystal.h>
 
+#define SET_HOUR 0
+#define SET_MINUTE 1
+#define BUTTON_NONE -1
+#define BUTTON_LEFT 0
+#define BUTTON_UP 1
+#define BUTTON_DOWN 2
+#define BUTTON_RIGHT 3
+
 LiquidCrystal myLCD(8, 9, 4, 5, 6, 7);
 ThreeWire myWire(20,21,19); // IO, SCLK, CE
 RtcDS1302<ThreeWire> myRTC(myWire);
 RtcDateTime alarmTime;
+int currentSetMode;
 
 void setup() {
   Serial.begin(9600);
@@ -16,6 +25,8 @@ void setup() {
 
 void setupLCD() {
   myLCD.begin(16,2);
+  // Setting mode of the alarm in LCD
+  currentSetMode = SET_HOUR;
 }
 
 void setupRTC() {
@@ -41,6 +52,7 @@ void setupRTC() {
 }
 
 void setupAlarm() {
+  // Initial alarm: 8 in the morning
   alarmTime = RtcDateTime(__DATE__, "08:00:00.000");
 }
 
@@ -48,7 +60,25 @@ void loop() {
   RtcDateTime now = myRTC.GetDateTime();
   printCurrentTime(now);
   printAlarmTime(alarmTime);
-  delay(1000);
+  int button = getPressedButton();
+  switch (button) {
+    case BUTTON_LEFT:
+      changeToHourMode();
+      break;
+    case BUTTON_RIGHT:
+      changeToMinuteMode();
+      break;
+    case BUTTON_DOWN:
+      decreaseAlarmTime();
+      break;
+    case BUTTON_UP:
+      increaseAlarmTime();
+      break;
+     default:
+      break;
+    }
+  
+  delay(500);
   // put your main code here, to run repeatedly:
 
 }
@@ -77,4 +107,46 @@ void printAlarmTime(const RtcDateTime& dt) {
             dt.Hour(),
             dt.Minute());
     myLCD.print(datestring);
+}
+
+int getPressedButton() {
+  int key_in = analogRead(0);
+  if (key_in < 50) return BUTTON_RIGHT;
+  if (key_in < 250) return BUTTON_UP;
+  if (key_in < 450) return BUTTON_DOWN;
+  if (key_in < 600) return BUTTON_LEFT;
+  // Ignore BUTTON_SELECT case, (currently) not necessary
+  return BUTTON_NONE;
+}
+
+void changeToHourMode() {
+  currentSetMode = SET_HOUR;
+  
+}
+
+void changeToMinuteMode() {
+  currentSetMode = SET_MINUTE;
+}
+
+void decreaseAlarmTime() {
+  int decreaseBy;
+  if (currentSetMode == SET_HOUR) {
+    decreaseBy = 3600;
+  }
+  else {
+    decreaseBy = 60;
+  }
+
+  alarmTime -= decreaseBy;
+}
+
+void increaseAlarmTime() {
+  int increaseBy;
+  if (currentSetMode == SET_HOUR) {
+    increaseBy = 3600;
+  }
+  else {
+    increaseBy = 60;
+  }
+  alarmTime += increaseBy; 
 }

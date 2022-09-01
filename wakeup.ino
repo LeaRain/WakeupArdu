@@ -5,18 +5,18 @@
 LiquidCrystal myLCD(8, 9, 4, 5, 6, 7);
 ThreeWire myWire(20,21,19); // IO, SCLK, CE
 RtcDS1302<ThreeWire> myRTC(myWire);
+RtcDateTime alarmTime;
 
 void setup() {
   Serial.begin(9600);
   setupLCD();
   setupRTC();
+  setupAlarm();
 }
 
 void setupLCD() {
-  myLCD.begin(16,1);
+  myLCD.begin(16,2);
 }
-
-
 
 void setupRTC() {
   myRTC.Begin();
@@ -40,25 +40,41 @@ void setupRTC() {
     }
 }
 
+void setupAlarm() {
+  alarmTime = RtcDateTime(__DATE__, "08:00:00.000");
+}
+
 void loop() {
   RtcDateTime now = myRTC.GetDateTime();
-  myLCD.setCursor(0, 1);
-  printDateTime(now);
+  printCurrentTime(now);
+  printAlarmTime(alarmTime);
   delay(1000);
   // put your main code here, to run repeatedly:
 
 }
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
-void printDateTime(const RtcDateTime& dt)
+void printCurrentTime(const RtcDateTime& dt)
 {
+  myLCD.setCursor(0, 0);
     char datestring[20];
 
     snprintf_P(datestring, 
             countof(datestring),
-            PSTR("%02u:%02u:%02u"),
+            PSTR("Now: %02u:%02u"),
             dt.Hour(),
-            dt.Minute(),
-            dt.Second() );
+            dt.Minute());
+    myLCD.print(datestring);
+}
+
+void printAlarmTime(const RtcDateTime& dt) {
+  myLCD.setCursor(0, 1);
+    char datestring[20];
+
+    snprintf_P(datestring, 
+            countof(datestring),
+            PSTR("Alarm: %02u:%02u"),
+            dt.Hour(),
+            dt.Minute());
     myLCD.print(datestring);
 }

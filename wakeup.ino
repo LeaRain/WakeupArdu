@@ -15,6 +15,7 @@ ThreeWire myWire(20,21,19); // IO, SCLK, CE
 RtcDS1302<ThreeWire> myRTC(myWire);
 RtcDateTime alarmTime;
 int currentSetMode;
+int loopRound = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -77,6 +78,11 @@ void loop() {
      default:
       break;
     }
+  loopRound += 1;
+
+  if (loopRound % 60 == 0) {
+    if (checkWakeUp(now) == 1) Serial.println(1337);  
+  }
   
   delay(500);
   // put your main code here, to run repeatedly:
@@ -114,6 +120,7 @@ int getPressedButton() {
   if (key_in < 50) return BUTTON_RIGHT;
   if (key_in < 250) return BUTTON_UP;
   if (key_in < 450) return BUTTON_DOWN;
+  // TODO: Debug something with button left
   if (key_in < 600) return BUTTON_LEFT;
   // Ignore BUTTON_SELECT case, (currently) not necessary
   return BUTTON_NONE;
@@ -149,4 +156,9 @@ void increaseAlarmTime() {
     increaseBy = 60;
   }
   alarmTime += increaseBy; 
+}
+
+int checkWakeUp(const RtcDateTime& currentTime) {
+  if (currentTime.Hour () == alarmTime.Hour() && currentTime.Minute() == alarmTime.Minute()) return 1;
+  return 0;
 }

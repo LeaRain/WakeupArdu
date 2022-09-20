@@ -1,3 +1,5 @@
+#include <FastLED.h>
+
 #include <ThreeWire.h>  
 #include <RtcDS1302.h>
 #include <LiquidCrystal.h>
@@ -10,18 +12,30 @@
 #define BUTTON_DOWN 2
 #define BUTTON_RIGHT 3
 
+#define NUM_LEDS 30
+#define DATA_PIN 36
+#define LIGHT_OFF 0
+#define LIGHT_ON 1
+
+CRGB leds[NUM_LEDS];
+
+
 LiquidCrystal myLCD(8, 9, 4, 5, 6, 7);
 ThreeWire myWire(20,21,19); // IO, SCLK, CE
 RtcDS1302<ThreeWire> myRTC(myWire);
 RtcDateTime alarmTime;
 int currentSetMode;
 int loopRound = 0;
+int wakeUpStarted = 0;
+int wakeUpStartedCount = 0;
+
 
 void setup() {
   Serial.begin(9600);
   setupLCD();
   setupRTC();
   setupAlarm();
+  setupLED();
 }
 
 void setupLCD() {
@@ -57,6 +71,11 @@ void setupAlarm() {
   alarmTime = RtcDateTime(__DATE__, "08:00:00.000");
 }
 
+void setupLED() {
+  FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
+  FastLED.setBrightness(0);
+}
+
 void loop() {
   RtcDateTime now = myRTC.GetDateTime();
   printCurrentTime(now);
@@ -81,9 +100,15 @@ void loop() {
   loopRound += 1;
 
   if (loopRound % 60 == 0) {
-    if (checkWakeUp(now) == 1) Serial.println(1337);  
+    if (checkWakeUp(now) == 1) startWakeUpRoutine();  
   }
   
+  if (wakeUpStarted == 1) {
+    wakeUpStartedCount +=1;
+    continueWakeUpRoutine();
+  }
+
+  Serial.println(wakeUpStarted);
   delay(500);
   // put your main code here, to run repeatedly:
 
@@ -120,7 +145,6 @@ int getPressedButton() {
   if (key_in < 50) return BUTTON_RIGHT;
   if (key_in < 150) return BUTTON_UP;
   if (key_in < 350) return BUTTON_DOWN;
-  // TODO: Debug something with button left
   if (key_in < 500) return BUTTON_LEFT;
   // Ignore BUTTON_SELECT case, (currently) not necessary
   return BUTTON_NONE;
@@ -161,4 +185,51 @@ void increaseAlarmTime() {
 int checkWakeUp(const RtcDateTime& currentTime) {
   if (currentTime.Hour () == alarmTime.Hour() && currentTime.Minute() == alarmTime.Minute()) return 1;
   return 0;
+}
+
+void startWakeUpRoutine() {
+   turnLEDOffOn(LIGHT_ON);
+   FastLED.setBrightness(4); 
+   FastLED.show();
+   wakeUpStarted = 1;
+}
+
+void continueWakeUpRoutine() {
+  if (wakeUpStartedCount > 2400) {
+    endWakeUpRoutine();
+    return;
+   }
+
+   if (wakeUpStartedCount > 1800) {
+    FastLED.setBrightness(128);
+    return;
+    }
+
+  if (wakeUpStartedCount > 1200) {
+    FastLED.setBrightness(64);
+    return;
+  }
+   
+  if (wakeUpStartedCount > 600) {
+    FastLED.setBrightness(32);
+    return;
+    }  
+}
+
+void endWakeUpRoutine() {
+  wakeUpStarted = 0;
+  wakeUpStartedCount = 0;
+  turnLEDOffOn(LIGHT_OFF);
+}
+
+void turnLEDOffOn(int colorValue) {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    if (colorValue == LIGHT_OFF) {
+      leds[i] = CRGB::Black;  
+    }
+    
+    if (colorValue == LIGHT_ON) {
+      leds[i] = CRGB::BlueViolet;
+    }
+   }
 }

@@ -118,10 +118,10 @@ void printAlarmTime(const RtcDateTime& dt) {
 int getPressedButton() {
   int key_in = analogRead(0);
   if (key_in < 50) return BUTTON_RIGHT;
-  if (key_in < 250) return BUTTON_UP;
-  if (key_in < 450) return BUTTON_DOWN;
+  if (key_in < 150) return BUTTON_UP;
+  if (key_in < 350) return BUTTON_DOWN;
   // TODO: Debug something with button left
-  if (key_in < 600) return BUTTON_LEFT;
+  if (key_in < 500) return BUTTON_LEFT;
   // Ignore BUTTON_SELECT case, (currently) not necessary
   return BUTTON_NONE;
 }

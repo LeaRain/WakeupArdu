@@ -12,7 +12,7 @@
 #define BUTTON_DOWN 2
 #define BUTTON_RIGHT 3
 
-#define NUM_LEDS 30
+#define NUM_LEDS 120
 #define DATA_PIN 36
 #define LIGHT_OFF 0
 #define LIGHT_ON 1
@@ -106,9 +106,9 @@ void loop() {
   if (wakeUpStarted == 1) {
     wakeUpStartedCount +=1;
     continueWakeUpRoutine();
+    FastLED.show();
   }
-
-  Serial.println(wakeUpStarted);
+  
   delay(500);
   // put your main code here, to run repeatedly:
 
@@ -219,6 +219,8 @@ void continueWakeUpRoutine() {
 void endWakeUpRoutine() {
   wakeUpStarted = 0;
   wakeUpStartedCount = 0;
+  FastLED.setBrightness(0);
+  FastLED.show();
   turnLEDOffOn(LIGHT_OFF);
 }
 

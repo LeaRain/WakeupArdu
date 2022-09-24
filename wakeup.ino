@@ -11,6 +11,7 @@
 #define BUTTON_UP 1
 #define BUTTON_DOWN 2
 #define BUTTON_RIGHT 3
+#define BUTTON_SELECT 4
 
 #define NUM_LEDS 120
 #define DATA_PIN 36
@@ -27,7 +28,6 @@ RtcDateTime alarmTime;
 int currentSetMode;
 int loopRound = 0;
 int wakeUpStarted = 0;
-int wakeUpStartedCount = 0;
 
 
 void setup() {
@@ -94,6 +94,8 @@ void loop() {
     case BUTTON_UP:
       increaseAlarmTime();
       break;
+     case BUTTON_SELECT:
+      turnLEDOffOn(LIGHT_OFF);
      default:
       break;
     }
@@ -104,8 +106,7 @@ void loop() {
   }
   
   if (wakeUpStarted == 1) {
-    wakeUpStartedCount +=1;
-    continueWakeUpRoutine();
+    continueWakeUpRoutine(now);
     FastLED.show();
   }
   
@@ -146,7 +147,7 @@ int getPressedButton() {
   if (key_in < 150) return BUTTON_UP;
   if (key_in < 350) return BUTTON_DOWN;
   if (key_in < 500) return BUTTON_LEFT;
-  // Ignore BUTTON_SELECT case, (currently) not necessary
+  if (key_in < 700) return BUTTON_SELECT;
   return BUTTON_NONE;
 }
 
@@ -187,6 +188,11 @@ int checkWakeUp(const RtcDateTime& currentTime) {
   return 0;
 }
 
+int checkSecondsAfterAlarm(const RtcDateTime& currentTime) {
+  int difference = currentTime - alarmTime;
+  return difference;
+  }
+
 void startWakeUpRoutine() {
    turnLEDOffOn(LIGHT_ON);
    FastLED.setBrightness(4); 
@@ -194,23 +200,25 @@ void startWakeUpRoutine() {
    wakeUpStarted = 1;
 }
 
-void continueWakeUpRoutine() {
-  if (wakeUpStartedCount > 2400) {
+void continueWakeUpRoutine(const RtcDateTime& currentTime) {
+  int secondsAfterAlarm = checkSecondsAfterAlarm(currentTime);
+  
+  if (secondsAfterAlarm > 1200) {
     endWakeUpRoutine();
     return;
    }
 
-   if (wakeUpStartedCount > 1800) {
+   if (secondsAfterAlarm > 900) {
     FastLED.setBrightness(128);
     return;
     }
 
-  if (wakeUpStartedCount > 1200) {
+  if (secondsAfterAlarm > 600) {
     FastLED.setBrightness(64);
     return;
   }
    
-  if (wakeUpStartedCount > 600) {
+  if (secondsAfterAlarm > 300) {
     FastLED.setBrightness(32);
     return;
     }  
@@ -218,20 +226,22 @@ void continueWakeUpRoutine() {
 
 void endWakeUpRoutine() {
   wakeUpStarted = 0;
-  wakeUpStartedCount = 0;
-  FastLED.setBrightness(0);
-  FastLED.show();
   turnLEDOffOn(LIGHT_OFF);
 }
 
 void turnLEDOffOn(int colorValue) {
+  if (colorValue == LIGHT_ON) {  
+  
   for (int i = 0; i < NUM_LEDS; i++) {
-    if (colorValue == LIGHT_OFF) {
-      leds[i] = CRGB::Black;  
-    }
-    
-    if (colorValue == LIGHT_ON) {
       leds[i] = CRGB::BlueViolet;
+     
     }
+    return;
+  }
+  
+
+  if (colorValue == LIGHT_OFF) {
+    FastLED.clear(); 
+    FastLED.show();
    }
 }

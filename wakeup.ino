@@ -1,11 +1,15 @@
 #include <FastLED.h>
-
 #include <ThreeWire.h>  
 #include <RtcDS1302.h>
 #include <LiquidCrystal.h>
 
+// Define two modes parameter change during the setting of the alarm
 #define SET_HOUR 0
 #define SET_MINUTE 1
+// Define two modes for the current operation for the alarm time
+#define DECREASE_ALARM 0
+#define INCREASE_ALARM 1
+// Define values for the different buttons on the LCD
 #define BUTTON_NONE -1
 #define BUTTON_LEFT 0
 #define BUTTON_UP 1
@@ -13,23 +17,35 @@
 #define BUTTON_RIGHT 3
 #define BUTTON_SELECT 4
 
+// Define number of LEDs on stripe
 #define NUM_LEDS 120
+// Data pin on Arduino Mega for LED stripes
 #define DATA_PIN 36
+// Mode for lights (on or off)
 #define LIGHT_OFF 0
 #define LIGHT_ON 1
 
+// Define an array for single access of LED on stripe
 CRGB leds[NUM_LEDS];
 
-
+// LCD parameters for display
 LiquidCrystal myLCD(8, 9, 4, 5, 6, 7);
-ThreeWire myWire(20,21,19); // IO, SCLK, CE
+// IO, SCLK, CE mapping on Arduino Mega
+ThreeWire myWire(20,21,19);
 RtcDS1302<ThreeWire> myRTC(myWire);
+// Value for alarm later
 RtcDateTime alarmTime;
+// Value for current mode for setting alarm -> minute or hour
 int currentSetMode;
+// Counter for void loop()
 int loopRound = 0;
+// Value determining if the wakeup has started
 int wakeUpStarted = 0;
 
 
+/* 
+ * Setup for different components of the alarm: LCD, RTC, alarm itself, LED stripe
+ */
 void setup() {
   Serial.begin(9600);
   setupLCD();
@@ -38,16 +54,24 @@ void setup() {
   setupLED();
 }
 
+/*
+ * LCD Setup: Define display and current mode
+ */
 void setupLCD() {
   myLCD.begin(16,2);
   // Setting mode of the alarm in LCD
-  currentSetMode = SET_HOUR;
+  changeAlarmSettingMode(SET_HOUR);
 }
 
+/*
+ * RTC Setup: Define current time, if not already done
+ */
 void setupRTC() {
   myRTC.Begin();
+  // Get current time
   RtcDateTime compileTime = RtcDateTime(__DATE__, __TIME__);
 
+  // Ask RTC if time is valid, if not, set
   if (!myRTC.IsDateTimeValid()) {
     myRTC.SetDateTime(compileTime);
   }
@@ -59,61 +83,80 @@ void setupRTC() {
     if (!myRTC.GetIsRunning()) {
         myRTC.SetIsRunning(true);
     }
+
+  // Check for current RTC time, overwrite if time is incorrect
   RtcDateTime now = myRTC.GetDateTime();
   if (now < compileTime) {
         myRTC.SetDateTime(compileTime);
-
     }
 }
 
+/*
+ * Setup alarm with an initial time
+ */
 void setupAlarm() {
   // Initial alarm: 8 in the morning
+  // TODO: ensure correct day
   alarmTime = RtcDateTime(__DATE__, "08:00:00.000");
 }
 
+/*
+ * Setup LEDs with their type, data and number of LEDs
+ */
 void setupLED() {
   FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
-  FastLED.setBrightness(0);
+  // Disable light if it was on
+  turnLEDOffOn(LIGHT_OFF);
 }
 
 void loop() {
+  // Get current time
   RtcDateTime now = myRTC.GetDateTime();
+  // Set current time and current alarm time on LCD
   printCurrentTime(now);
   printAlarmTime(alarmTime);
+  // Get the current pressed button to apply changes
   int button = getPressedButton();
   switch (button) {
     case BUTTON_LEFT:
-      changeToHourMode();
+      changeAlarmSettingMode(SET_HOUR);
       break;
     case BUTTON_RIGHT:
-      changeToMinuteMode();
+      changeAlarmSettingMode(SET_MINUTE);
       break;
     case BUTTON_DOWN:
-      decreaseAlarmTime();
+      changeAlarmTime(DECREASE_ALARM);
       break;
     case BUTTON_UP:
-      increaseAlarmTime();
+      changeAlarmTime(INCREASE_ALARM);
       break;
      case BUTTON_SELECT:
       turnLEDOffOn(LIGHT_OFF);
      default:
       break;
     }
+
+  // Increase loop count for checkups
   loopRound += 1;
 
+  // Check every 30 seconds (since delay is 500 ms) if it's time to start the wakup
+  // Exact second matching is not necessary in this case, we are open to some inaccuracies
   if (loopRound % 60 == 0) {
+    // If it's time to wakeup, start the wakeup routine
     if (checkWakeUp(now) == 1) startWakeUpRoutine();  
   }
-  
+
+  // Check for currently running wakeup routine and proceed if necessary
   if (wakeUpStarted == 1) {
     continueWakeUpRoutine(now);
     FastLED.show();
   }
   
   delay(500);
-  // put your main code here, to run repeatedly:
-
 }
+
+
+// Print current time, source: https://starthardware.org/arduino-uhrzeit-mit-der-real-time-clock-rtc/
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
 void printCurrentTime(const RtcDateTime& dt)
@@ -141,6 +184,10 @@ void printAlarmTime(const RtcDateTime& dt) {
     myLCD.print(datestring);
 }
 
+/*
+ * Get the current pressed button for proceeding with further input
+ * Values for key_in measured with Serial.println(key_in)
+ */
 int getPressedButton() {
   int key_in = analogRead(0);
   if (key_in < 50) return BUTTON_RIGHT;
@@ -151,48 +198,54 @@ int getPressedButton() {
   return BUTTON_NONE;
 }
 
-void changeToHourMode() {
-  currentSetMode = SET_HOUR;
-  
+/*
+ * Change the mode for alarm setting to hour or minute
+ */
+void changeAlarmSettingMode(int mode) {
+  currentSetMode = mode;  
 }
 
-void changeToMinuteMode() {
-  currentSetMode = SET_MINUTE;
-}
-
-void decreaseAlarmTime() {
-  int decreaseBy;
+/*
+ * Change the alarm time based on the current mode (hour/minute and increase/decrease)
+ */
+void changeAlarmTime(int mode) {
+  int changeBy;
   if (currentSetMode == SET_HOUR) {
-    decreaseBy = 3600;
+    changeBy = 3600;
   }
   else {
-    decreaseBy = 60;
+    changeBy = 60;
   }
 
-  alarmTime -= decreaseBy;
-}
-
-void increaseAlarmTime() {
-  int increaseBy;
-  if (currentSetMode == SET_HOUR) {
-    increaseBy = 3600;
+  if (mode == DECREASE_ALARM) {
+    alarmTime -= changeBy;  
   }
+
   else {
-    increaseBy = 60;
+    alarmTime += changeBy;  
   }
-  alarmTime += increaseBy; 
 }
 
+/*
+ * Check if it's time for wakeup based on the current time
+ */
 int checkWakeUp(const RtcDateTime& currentTime) {
+  // Check for hour and minute, seconds irrelevant, inaccuracy allowed
   if (currentTime.Hour () == alarmTime.Hour() && currentTime.Minute() == alarmTime.Minute()) return 1;
   return 0;
 }
 
+/*
+ * Check for the seconds after the alarm time based on the current time
+ */
 int checkSecondsAfterAlarm(const RtcDateTime& currentTime) {
   int difference = currentTime - alarmTime;
   return difference;
-  }
+}
 
+/*
+ * Start the wake up: Turn the lights on, activate the start mode
+ */
 void startWakeUpRoutine() {
    turnLEDOffOn(LIGHT_ON);
    FastLED.setBrightness(4); 
@@ -200,6 +253,9 @@ void startWakeUpRoutine() {
    wakeUpStarted = 1;
 }
 
+/*
+ * Increase brightness (or end lighting) based on the time since the alarm started
+ */
 void continueWakeUpRoutine(const RtcDateTime& currentTime) {
   int secondsAfterAlarm = checkSecondsAfterAlarm(currentTime);
   
@@ -224,23 +280,30 @@ void continueWakeUpRoutine(const RtcDateTime& currentTime) {
     }  
 }
 
+/*
+ * End the wakeup routine with turning light off and changing the parameter
+ */
 void endWakeUpRoutine() {
   wakeUpStarted = 0;
   turnLEDOffOn(LIGHT_OFF);
+  // TODO: Set date of alarm to next day
 }
 
+/*
+ * Turn the light off or on
+ */
 void turnLEDOffOn(int colorValue) {
   if (colorValue == LIGHT_ON) {  
   
   for (int i = 0; i < NUM_LEDS; i++) {
+      // BlueViolet is beautiful
       leds[i] = CRGB::BlueViolet;
-     
     }
     return;
   }
   
-
   if (colorValue == LIGHT_OFF) {
+    // Lights off
     FastLED.clear(); 
     FastLED.show();
    }

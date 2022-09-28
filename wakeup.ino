@@ -95,9 +95,9 @@ void setupRTC() {
  * Setup alarm with an initial time
  */
 void setupAlarm() {
-  // Initial alarm: 8 in the morning
-  // TODO: ensure correct day
-  alarmTime = RtcDateTime(__DATE__, "08:00:00.000");
+  // Initial alarm time: One hour after boot
+  RtcDateTime now = myRTC.GetDateTime();
+  alarmTime = now + 3600;
 }
 
 /*
@@ -240,6 +240,7 @@ int checkWakeUp(const RtcDateTime& currentTime) {
  */
 int checkSecondsAfterAlarm(const RtcDateTime& currentTime) {
   int difference = currentTime - alarmTime;
+  Serial.println(difference);
   return difference;
 }
 
@@ -286,7 +287,8 @@ void continueWakeUpRoutine(const RtcDateTime& currentTime) {
 void endWakeUpRoutine() {
   wakeUpStarted = 0;
   turnLEDOffOn(LIGHT_OFF);
-  // TODO: Set date of alarm to next day
+  // Set the alarm time to the same time on the next day
+  alarmTime += 86400;
 }
 
 /*

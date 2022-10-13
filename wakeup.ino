@@ -149,9 +149,7 @@ void loop() {
   // Check for currently running wakeup routine and proceed if necessary
   if (wakeUpStarted == 1) {
     continueWakeUpRoutine(now);
-    FastLED.show();
   }
-  
   delay(500);
 }
 
@@ -166,9 +164,10 @@ void printCurrentTime(const RtcDateTime& dt)
 
     snprintf_P(datestring, 
             countof(datestring),
-            PSTR("Now: %02u:%02u"),
+            PSTR("Now: %02u:%02u(%02u)"),
             dt.Hour(),
-            dt.Minute());
+            dt.Minute(),
+            dt.Day());
     myLCD.print(datestring);
 }
 
@@ -178,9 +177,10 @@ void printAlarmTime(const RtcDateTime& dt) {
 
     snprintf_P(datestring, 
             countof(datestring),
-            PSTR("Alarm: %02u:%02u"),
+            PSTR("Alarm: %02u:%02u(%02u)"),
             dt.Hour(),
-            dt.Minute());
+            dt.Minute(),
+            dt.Day());
     myLCD.print(datestring);
 }
 
@@ -240,7 +240,6 @@ int checkWakeUp(const RtcDateTime& currentTime) {
  */
 int checkSecondsAfterAlarm(const RtcDateTime& currentTime) {
   int difference = currentTime - alarmTime;
-  Serial.println(difference);
   return difference;
 }
 
@@ -261,14 +260,14 @@ void continueWakeUpRoutine(const RtcDateTime& currentTime) {
   int secondsAfterAlarm = checkSecondsAfterAlarm(currentTime);
   
   if (secondsAfterAlarm > 1200) {
+    Serial.println("Ending wakeup...");
     endWakeUpRoutine();
-    return;
    }
 
-   if (secondsAfterAlarm > 900) {
+  if (secondsAfterAlarm > 900) {
     FastLED.setBrightness(128);
     return;
-    }
+  }
 
   if (secondsAfterAlarm > 600) {
     FastLED.setBrightness(64);
@@ -278,17 +277,26 @@ void continueWakeUpRoutine(const RtcDateTime& currentTime) {
   if (secondsAfterAlarm > 300) {
     FastLED.setBrightness(32);
     return;
-    }  
+   }  
 }
 
 /*
  * End the wakeup routine with turning light off and changing the parameter
  */
 void endWakeUpRoutine() {
+    // Set the alarm time to the same time on the next day
+  uint8_t newAlarmDay = alarmTime.Day() + 1;
+  RtcDateTime newAlarmTime = RtcDateTime(
+    alarmTime.Year(),
+    alarmTime.Month(),
+    newAlarmDay,
+    alarmTime.Hour(),
+    alarmTime.Minute(),
+    alarmTime.Second());
+   alarmTime = newAlarmTime;
+
   wakeUpStarted = 0;
   turnLEDOffOn(LIGHT_OFF);
-  // Set the alarm time to the same time on the next day
-  alarmTime += 86400;
 }
 
 /*

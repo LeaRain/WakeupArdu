@@ -41,6 +41,8 @@ int currentSetMode;
 int loopRound = 0;
 // Value determining if the wakeup has started
 int wakeUpStarted = 0;
+// Value determining if the evening has started
+int eveningStarted = 0;
 
 
 /* 
@@ -139,16 +141,22 @@ void loop() {
   // Increase loop count for checkups
   loopRound += 1;
 
-  // Check every 30 seconds (since delay is 500 ms) if it's time to start the wakup
+  // Check every 30 seconds (since delay is 500 ms) if it's time to start a LED procedure
   // Exact second matching is not necessary in this case, we are open to some inaccuracies
   if (loopRound % 60 == 0) {
     // If it's time to wakeup, start the wakeup routine
     if (checkWakeUp(now) == 1) startWakeUpRoutine();  
+    // Start evening routine if it's evening
+    if (checkEveningRoutine(now) == 1) startEveningRoutine();
   }
 
   // Check for currently running wakeup routine and proceed if necessary
   if (wakeUpStarted == 1) {
     continueWakeUpRoutine(now);
+  }
+
+  if (eveningStarted == 1) {
+    continueEveningRoutine(now);  
   }
   delay(500);
 }
@@ -236,6 +244,17 @@ int checkWakeUp(const RtcDateTime& currentTime) {
 }
 
 /*
+ * Check if it's time for evening based on the current time
+ */
+int checkEveningRoutine(const RtcDateTime& currentTime) {
+  // Current hour for further checks
+  int currentHour = currentTime.Hour();
+  // Yes my evening lasts from 16:00 to 20:59 
+  if (currentHour >= 16 || currentHour <= 20) return 1;
+  return 0;
+}
+
+/*
  * Check for the seconds after the alarm time based on the current time
  */
 int checkSecondsAfterAlarm(const RtcDateTime& currentTime) {
@@ -251,6 +270,18 @@ void startWakeUpRoutine() {
    FastLED.setBrightness(4); 
    FastLED.show();
    wakeUpStarted = 1;
+}
+
+/*
+ * Start the evening routine: just turn the lights on
+ */
+void startEveningRoutine() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+      // today's choice: orange
+      leds[i] = CRGB::Orange;
+  }
+  FastLED.show();
+  eveningStarted = 1;
 }
 
 /*
@@ -281,6 +312,17 @@ void continueWakeUpRoutine(const RtcDateTime& currentTime) {
 }
 
 /*
+ * Check if the evening routine is still up and running
+ */
+void continueEveningRoutine(const RtcDateTime& currentTime) {
+  int currentHour = currentTime.Hour();
+  Serial.println(currentHour);
+  // Evening's over
+  if (currentHour < 16 && currentHour > 20) endEveningRoutine();
+}
+
+
+/*
  * End the wakeup routine with turning light off and changing the parameter
  */
 void endWakeUpRoutine() {
@@ -296,6 +338,14 @@ void endWakeUpRoutine() {
    alarmTime = newAlarmTime;
 
   wakeUpStarted = 0;
+  turnLEDOffOn(LIGHT_OFF);
+}
+
+/*
+ * Turn lights off, go to bed
+ */
+void endEveningRoutine() {
+  eveningStarted = 0;  
   turnLEDOffOn(LIGHT_OFF);
 }
 

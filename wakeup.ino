@@ -43,6 +43,8 @@ int loopRound = 0;
 int wakeUpStarted = 0;
 // Value determining if the evening has started
 int eveningStarted = 0;
+// Value determining if light is currently on
+int lightCurrentlyOn = 0;
 
 
 /* 
@@ -133,7 +135,7 @@ void loop() {
       changeAlarmTime(INCREASE_ALARM);
       break;
      case BUTTON_SELECT:
-      turnLEDOffOn(LIGHT_OFF);
+      lightSwitch();
      default:
       break;
     }
@@ -147,7 +149,7 @@ void loop() {
     // If it's time to wakeup, start the wakeup routine
     if (checkWakeUp(now) == 1) startWakeUpRoutine();  
     // Start evening routine if it's evening
-    if (checkEveningRoutine(now) == 1) startEveningRoutine();
+    // if (checkEveningRoutine(now) == 1) startEveningRoutine();
   }
 
   // Check for currently running wakeup routine and proceed if necessary
@@ -155,9 +157,9 @@ void loop() {
     continueWakeUpRoutine(now);
   }
 
-  if (eveningStarted == 1) {
-    continueEveningRoutine(now);  
-  }
+  //if (eveningStarted == 1) {
+  //  continueEveningRoutine(now);  
+  //}
   delay(500);
 }
 
@@ -250,7 +252,7 @@ int checkEveningRoutine(const RtcDateTime& currentTime) {
   // Current hour for further checks
   int currentHour = currentTime.Hour();
   // Yes my evening lasts from 16:00 to 20:59 
-  if (currentHour >= 16 || currentHour <= 20) return 1;
+  if (currentHour >= 10 && currentHour <= 20) return 1;
   return 0;
 }
 
@@ -267,6 +269,7 @@ int checkSecondsAfterAlarm(const RtcDateTime& currentTime) {
  */
 void startWakeUpRoutine() {
    turnLEDOffOn(LIGHT_ON);
+   lightCurrentlyOn = 1;
    FastLED.setBrightness(4); 
    FastLED.show();
    wakeUpStarted = 1;
@@ -276,6 +279,7 @@ void startWakeUpRoutine() {
  * Start the evening routine: just turn the lights on
  */
 void startEveningRoutine() {
+  lightCurrentlyOn = 1;
   for (int i = 0; i < NUM_LEDS; i++) {
       // today's choice: orange
       leds[i] = CRGB::Orange;
@@ -316,9 +320,11 @@ void continueWakeUpRoutine(const RtcDateTime& currentTime) {
  */
 void continueEveningRoutine(const RtcDateTime& currentTime) {
   int currentHour = currentTime.Hour();
-  Serial.println(currentHour);
+  int i = 42 + 0;
+  
+  //Serial.println(currentHour);
   // Evening's over
-  if (currentHour < 16 && currentHour > 20) endEveningRoutine();
+  if (currentHour < 10 && currentHour > 20) endEveningRoutine();
 }
 
 
@@ -339,6 +345,7 @@ void endWakeUpRoutine() {
 
   wakeUpStarted = 0;
   turnLEDOffOn(LIGHT_OFF);
+  lightCurrentlyOn = 0;
 }
 
 /*
@@ -347,6 +354,23 @@ void endWakeUpRoutine() {
 void endEveningRoutine() {
   eveningStarted = 0;  
   turnLEDOffOn(LIGHT_OFF);
+  lightCurrentlyOn = 0;
+}
+
+void lightSwitch() {
+    if (lightCurrentlyOn == LIGHT_ON) {
+      turnLEDOffOn(LIGHT_OFF);
+      lightCurrentlyOn = 0;
+    }
+
+    else {
+      turnLEDOffOn(LIGHT_ON);
+      FastLED.setBrightness(128);
+      FastLED.show();
+      lightCurrentlyOn = 1;  
+    }
+
+    Serial.println(lightCurrentlyOn);
 }
 
 /*
